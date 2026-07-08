@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+**/TestResults/
+.vs/
+package/*.publisher.log
+package/*report.json
+package/*.install-status.txt

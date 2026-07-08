@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <Compile Include="..\PlcSourceExporter.AddInShared\ExportAddInWorkflow.cs" Link="AddInShared\ExportAddInWorkflow.cs" />
+    <Compile Include="..\PlcSourceExporter.AddInShared\ExportProgressForm.cs" Link="AddInShared\ExportProgressForm.cs" />
+    <Compile Include="..\PlcSourceExporter.AddInShared\ExportProgressWindow.cs" Link="AddInShared\ExportProgressWindow.cs" />
+    <Compile Include="..\PlcSourceExporter.SiemensShared\SiemensPlcSoftwareSource.cs" Link="SiemensShared\SiemensPlcSoftwareSource.cs" />
+    <ProjectReference Include="..\PlcSourceExporter.Core\PlcSourceExporter.Core.csproj" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="Siemens.Engineering.AddIn">
+      <HintPath>C:\Program Files\Siemens\Automation\Portal V17\PublicAPI\V17.AddIn\Siemens.Engineering.AddIn.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Siemens.Engineering.AddIn.CntxtMn">
+      <HintPath>C:\Program Files\Siemens\Automation\Portal V17\Bin\PublicAPI\AddIn\Feature\V17.AddIn\Siemens.Engineering.AddIn.CntxtMn.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)microsoft.data.sqlite.core\8.0.0\lib\netstandard2.0\Microsoft.Data.Sqlite.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.bundle_e_sqlite3\2.1.6\lib\net461\SQLitePCLRaw.batteries_v2.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.core\2.1.6\lib\netstandard2.0\SQLitePCLRaw.core.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.provider.e_sqlite3\2.1.6\lib\netstandard2.0\SQLitePCLRaw.provider.e_sqlite3.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3\2.1.6\runtimes\win-x64\native\e_sqlite3.dll" />
+  </ItemGroup>
+
+  <Target Name="CopySqliteRuntimeDependencies" AfterTargets="Build">
+    <Copy SourceFiles="@(SqliteRuntimeDependency)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

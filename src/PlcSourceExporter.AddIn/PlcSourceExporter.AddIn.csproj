@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <Compile Include="..\PlcSourceExporter.AddInShared\ExportAddInWorkflow.cs" Link="AddInShared\ExportAddInWorkflow.cs" />
+    <Compile Include="..\PlcSourceExporter.AddInShared\ExportProgressForm.cs" Link="AddInShared\ExportProgressForm.cs" />
+    <Compile Include="..\PlcSourceExporter.AddInShared\ExportProgressWindow.cs" Link="AddInShared\ExportProgressWindow.cs" />
+    <Compile Include="..\PlcSourceExporter.SiemensShared\SiemensPlcSoftwareSource.cs" Link="SiemensShared\SiemensPlcSoftwareSource.cs" />
+    <ProjectReference Include="..\PlcSourceExporter.Core\PlcSourceExporter.Core.csproj" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="Siemens.Engineering.AddIn">
+      <HintPath>C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20.AddIn\Siemens.Engineering.AddIn.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Siemens.Engineering.AddIn.CntxtMn">
+      <HintPath>C:\Program Files\Siemens\Automation\Portal V20\Bin\PublicAPI\AddIn\Feature\V20.AddIn\Siemens.Engineering.AddIn.CntxtMn.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+</Project>
