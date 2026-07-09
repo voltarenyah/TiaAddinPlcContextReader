@@ -32,7 +32,16 @@
       <Assembly>..\src\PlcSourceExporter.AddIn.V17\bin\Debug\net48\SQLitePCLRaw.provider.e_sqlite3.dll</Assembly>
     </AssemblyInfo>
     <AssemblyInfo>
-      <Assembly>..\src\PlcSourceExporter.AddIn.V17\bin\Debug\net48\e_sqlite3.dll</Assembly>
+      <Assembly>..\src\PlcSourceExporter.AddIn.V17\bin\Debug\net48\System.Buffers.dll</Assembly>
+    </AssemblyInfo>
+    <AssemblyInfo>
+      <Assembly>..\src\PlcSourceExporter.AddIn.V17\bin\Debug\net48\System.Memory.dll</Assembly>
+    </AssemblyInfo>
+    <AssemblyInfo>
+      <Assembly>..\src\PlcSourceExporter.AddIn.V17\bin\Debug\net48\System.Numerics.Vectors.dll</Assembly>
+    </AssemblyInfo>
+    <AssemblyInfo>
+      <Assembly>..\src\PlcSourceExporter.AddIn.V17\bin\Debug\net48\System.Runtime.CompilerServices.Unsafe.dll</Assembly>
     </AssemblyInfo>
   </AdditionalAssemblies>
   <RequiredPermissions>
@@ -48,9 +57,9 @@
       <System.Security.Permissions.UIPermission>
         <Comment>Display the export progress window and completion status.</Comment>
       </System.Security.Permissions.UIPermission>
-      <System.Security.Permissions.SecurityPermission.UnmanagedCode>
-        <Comment>Load the native SQLite runtime used to write the semantic graph database.</Comment>
-      </System.Security.Permissions.SecurityPermission.UnmanagedCode>
+      <Siemens.Engineering.AddIn.Permissions.ProcessStartPermission>
+        <Comment>Start the semantic model helper process that writes the SQLite graph outside the TIA add-in sandbox.</Comment>
+      </Siemens.Engineering.AddIn.Permissions.ProcessStartPermission>
     </SecurityPermissions>
   </RequiredPermissions>
   <DisplayInMultiuser />

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using PlcSourceExporter.Core;
 using Siemens.Engineering;
 using Siemens.Engineering.SW;
@@ -166,121 +165,6 @@ internal static class SiemensPlcSoftwareSource
         }
     }
 
-    internal static int CountBlocks(
-        PlcBlockGroup group,
-        string path,
-        Stopwatch stopwatch,
-        TimeSpan maxElapsed,
-        IExportLogger logger,
-        IProgress<ExportProgress>? progress)
-    {
-        ThrowIfCountTimedOut(stopwatch, maxElapsed);
-        ReportCountProgress(progress, $"Counting PLC blocks under {path}", path);
-        var count = Count(() => group.Blocks.Count, "blocks", path);
-        foreach (var child in SnapshotForCount(() => group.Groups, "block groups", path))
-        {
-            var name = TryReadNameForCount(() => child.Name, "block group", path);
-            count += CountBlocks(child, $"{path}/{name}", stopwatch, maxElapsed, logger, progress);
-        }
-
-        return count;
-    }
-
-    internal static int CountTypes(
-        PlcTypeGroup group,
-        string path,
-        Stopwatch stopwatch,
-        TimeSpan maxElapsed,
-        IExportLogger logger,
-        IProgress<ExportProgress>? progress)
-    {
-        ThrowIfCountTimedOut(stopwatch, maxElapsed);
-        ReportCountProgress(progress, $"Counting PLC user data types under {path}", path);
-        var count = Count(() => group.Types.Count, "UDTs", path);
-        foreach (var child in SnapshotForCount(() => group.Groups, "UDT groups", path))
-        {
-            var name = TryReadNameForCount(() => child.Name, "UDT group", path);
-            count += CountTypes(child, $"{path}/{name}", stopwatch, maxElapsed, logger, progress);
-        }
-
-        return count;
-    }
-
-    internal static int CountTagTables(
-        PlcTagTableGroup group,
-        string path,
-        Stopwatch stopwatch,
-        TimeSpan maxElapsed,
-        IExportLogger logger,
-        IProgress<ExportProgress>? progress)
-    {
-        ThrowIfCountTimedOut(stopwatch, maxElapsed);
-        ReportCountProgress(progress, $"Counting PLC tag tables under {path}", path);
-        var count = Count(() => group.TagTables.Count, "tag tables", path);
-        foreach (var child in SnapshotForCount(() => group.Groups, "tag table groups", path))
-        {
-            var name = TryReadNameForCount(() => child.Name, "tag table group", path);
-            count += CountTagTables(child, $"{path}/{name}", stopwatch, maxElapsed, logger, progress);
-        }
-
-        return count;
-    }
-
-    private static int Count(Func<int> count, string description, string path)
-    {
-        try
-        {
-            return count();
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                $"Unable to count {description} under {path}: {ExceptionMessages.GetMeaningfulMessage(ex)}",
-                ex);
-        }
-    }
-
-    private static IReadOnlyList<T> SnapshotForCount<T>(Func<IEnumerable<T>> enumerate, string description, string path)
-    {
-        try
-        {
-            return enumerate().ToList();
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                $"Unable to count {description} under {path}: {ExceptionMessages.GetMeaningfulMessage(ex)}",
-                ex);
-        }
-    }
-
-    private static string TryReadNameForCount(Func<string> readName, string description, string path)
-    {
-        try
-        {
-            return readName();
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                $"Unable to read {description} name under {path}: {ExceptionMessages.GetMeaningfulMessage(ex)}",
-                ex);
-        }
-    }
-
-    private static void ThrowIfCountTimedOut(Stopwatch stopwatch, TimeSpan maxElapsed)
-    {
-        if (maxElapsed >= TimeSpan.Zero && stopwatch.Elapsed > maxElapsed)
-        {
-            throw new TimeoutException($"Counting PLC software objects exceeded {maxElapsed.TotalSeconds:0.#} seconds.");
-        }
-    }
-
-    private static void ReportCountProgress(IProgress<ExportProgress>? progress, string message, string path)
-    {
-        progress?.Report(new ExportProgress(ExportPhase.EnumeratingObjects, 3, message, path));
-    }
-
     private static IReadOnlyList<T> Snapshot<T>(
         Func<IEnumerable<T>> enumerate,
         string description,
@@ -329,7 +213,7 @@ internal static class SiemensPlcSoftwareSource
     }
 }
 
-internal sealed class LivePlcSoftwareSource : IPlcSoftwareSource, IPlcSoftwareObjectCounter
+internal sealed class LivePlcSoftwareSource : IPlcSoftwareSource
 {
     private readonly PlcSoftware _plcSoftware;
     private readonly Action<object, string> _exportObject;
@@ -343,48 +227,6 @@ internal sealed class LivePlcSoftwareSource : IPlcSoftwareSource, IPlcSoftwareOb
         _plcSoftware = plcSoftware;
         _exportObject = exportObject;
         _logger = logger;
-    }
-
-    public bool TryCountObjects(
-        TimeSpan maxElapsed,
-        IExportLogger logger,
-        IProgress<ExportProgress>? progress,
-        out int totalObjects)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        try
-        {
-            var blockCount = SiemensPlcSoftwareSource.CountBlocks(
-                _plcSoftware.BlockGroup,
-                "Blocks",
-                stopwatch,
-                maxElapsed,
-                logger,
-                progress);
-            var typeCount = SiemensPlcSoftwareSource.CountTypes(
-                _plcSoftware.TypeGroup,
-                "Types",
-                stopwatch,
-                maxElapsed,
-                logger,
-                progress);
-            var tagTableCount = SiemensPlcSoftwareSource.CountTagTables(
-                _plcSoftware.TagTableGroup,
-                "Tags",
-                stopwatch,
-                maxElapsed,
-                logger,
-                progress);
-            totalObjects = blockCount + typeCount + tagTableCount;
-            logger.Info($"Counted PLC software objects: {blockCount} blocks, {typeCount} UDTs, {tagTableCount} tag tables");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            totalObjects = 0;
-            logger.Warning($"Unable to count PLC software objects: {ExceptionMessages.GetMeaningfulMessage(ex)}");
-            return false;
-        }
     }
 
     public IEnumerable<IPlcExportableObject> EnumerateBlocks() =>

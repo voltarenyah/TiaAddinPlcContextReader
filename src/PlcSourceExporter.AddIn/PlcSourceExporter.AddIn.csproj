@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Include="..\PlcSourceExporter.AddInShared\AddInSemanticPlcModelWriter.cs" Link="AddInShared\AddInSemanticPlcModelWriter.cs" />
     <Compile Include="..\PlcSourceExporter.AddInShared\ExportAddInWorkflow.cs" Link="AddInShared\ExportAddInWorkflow.cs" />
     <Compile Include="..\PlcSourceExporter.AddInShared\ExportProgressForm.cs" Link="AddInShared\ExportProgressForm.cs" />
     <Compile Include="..\PlcSourceExporter.AddInShared\ExportProgressWindow.cs" Link="AddInShared\ExportProgressWindow.cs" />
@@ -10,6 +11,10 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="Siemens.Engineering.AddIn">
       <HintPath>C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20.AddIn\Siemens.Engineering.AddIn.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Siemens.Engineering.AddIn.Utilities">
+      <HintPath>C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20.AddIn\Siemens.Engineering.AddIn.Utilities.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Siemens.Engineering.AddIn.CntxtMn">

@@ -598,6 +598,27 @@ public sealed class PlcExportServiceTests
     }
 
     [Fact]
+    public void UsesInjectedSemanticModelWriterForAddInSafeOutOfProcessGeneration()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "PlcSourceExporterTests", Guid.NewGuid().ToString("N"));
+        var semanticWriter = new FakeSemanticModelWriter();
+        var service = new PlcExportService(
+            () => new DateTimeOffset(2026, 7, 9, 1, 2, 3, TimeSpan.Zero),
+            semanticWriter);
+        var plc = FakePlcSoftware.Create(
+            blocks: [new FakeExportableObject("Blocks/Main", "OrganizationBlock")],
+            types: [],
+            tagTables: []);
+
+        var summary = service.Export(plc, root);
+
+        Assert.Equal(root, semanticWriter.ExportRoot);
+        Assert.Equal(Path.Combine(root, "model", "plc-graph.sqlite"), summary.SemanticModelSqliteFilePath);
+        Assert.Equal(Path.Combine(root, "model", "schema.sql"), summary.SemanticModelSchemaFilePath);
+        Assert.Equal(Path.Combine(root, "model", "AGENT_SQLITE_GUIDE.md"), summary.SemanticModelAgentGuideFilePath);
+    }
+
+    [Fact]
     public void ReportsProgressThroughObjectExportAndPostProcessing()
     {
         var root = Path.Combine(Path.GetTempPath(), "PlcSourceExporterTests", Guid.NewGuid().ToString("N"));
@@ -616,20 +637,18 @@ public sealed class PlcExportServiceTests
 
         Assert.Contains(updates, update => update.Phase == ExportPhase.Preparing && update.PercentComplete == 0);
         Assert.Contains(updates, update => update.Phase == ExportPhase.ExportingObjects && update.CurrentItem == "Blocks/Main");
-        Assert.Contains(updates, update => update.Phase == ExportPhase.ExportingObjects && update.CompletedItems == 4 && update.TotalItems == 4);
+        Assert.Contains(updates, update => update.Phase == ExportPhase.ExportingObjects && update.CompletedItems == 4 && update.TotalItems == 0);
         Assert.Contains(updates, update => update.Phase == ExportPhase.WritingDerivedArtifacts && update.Message.Contains("component metadata", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(100, updates[^1].PercentComplete);
         Assert.Equal(ExportPhase.Completed, updates[^1].Phase);
     }
 
     [Fact]
-    public void ReportsKnownTotalWhileEnumeratingWhenCountSucceeds()
+    public void ReportsExportedCountWithoutCountingObjectsFirst()
     {
         var root = Path.Combine(Path.GetTempPath(), "PlcSourceExporterTests", Guid.NewGuid().ToString("N"));
         var service = new PlcExportService(() => new DateTimeOffset(2026, 7, 4, 1, 2, 3, TimeSpan.Zero));
-        var plc = FakeCountedPlcSoftware.Create(
-            4,
-            countSucceeds: true,
+        var plc = FakePlcSoftware.Create(
             blocks:
             [
                 new FakeExportableObject("Blocks/Main", "OrganizationBlock"),
@@ -641,49 +660,37 @@ public sealed class PlcExportServiceTests
 
         service.Export(plc, root, progress: new RecordingProgress(updates));
 
+        Assert.DoesNotContain(updates, update => update.Message.Contains("Counting", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(updates, update => update.Phase == ExportPhase.EnumeratingObjects);
+        Assert.DoesNotContain(updates, update => update.TotalItems > 0 && update.Phase == ExportPhase.ExportingObjects);
         Assert.Contains(updates, update =>
-            update.Phase == ExportPhase.EnumeratingObjects &&
+            update.Phase == ExportPhase.ExportingObjects &&
             update.CurrentItem == "Blocks/Main" &&
             update.CompletedItems == 1 &&
-            update.TotalItems == 4);
-        Assert.Contains(updates, update =>
-            update.Phase == ExportPhase.EnumeratingObjects &&
-            update.CompletedItems == 4 &&
-            update.TotalItems == 4 &&
-            update.PercentComplete == 15);
+            update.TotalItems == 0);
     }
 
     [Fact]
-    public void FallsBackToDiscoveredCountWhileEnumeratingWhenCountFails()
+    public void StreamsExportWithoutPreEnumeratingAllObjects()
     {
         var root = Path.Combine(Path.GetTempPath(), "PlcSourceExporterTests", Guid.NewGuid().ToString("N"));
         var service = new PlcExportService(() => new DateTimeOffset(2026, 7, 4, 1, 2, 3, TimeSpan.Zero));
-        var plc = FakeCountedPlcSoftware.Create(
-            0,
-            countSucceeds: false,
+        var events = new List<string>();
+        var plc = StreamingFakePlcSoftware.Create(
             blocks:
             [
-                new FakeExportableObject("Blocks/Main", "OrganizationBlock"),
-                new FakeExportableObject("Blocks/Logic", "FunctionBlock")
+                new FakeExportableObject("Blocks/Main", "OrganizationBlock", afterExport: () => events.Add("export Main")),
+                new FakeExportableObject("Blocks/Logic", "FunctionBlock", afterExport: () => events.Add("export Logic"))
             ],
             types: [],
-            tagTables: []);
-        var updates = new List<ExportProgress>();
+            tagTables: [],
+            events);
 
-        service.Export(plc, root, progress: new RecordingProgress(updates));
+        service.Export(plc, root);
 
-        Assert.Contains(updates, update =>
-            update.Phase == ExportPhase.EnumeratingObjects &&
-            update.CurrentItem == "Blocks/Main" &&
-            update.CompletedItems == 1 &&
-            update.TotalItems == 0);
-        Assert.Contains(updates, update =>
-            update.Phase == ExportPhase.EnumeratingObjects &&
-            update.CompletedItems == 2 &&
-            update.TotalItems == 0);
-        Assert.Contains(updates, update =>
-            update.Phase == ExportPhase.ExportingObjects &&
-            update.TotalItems == 2);
+        Assert.True(
+            events.IndexOf("export Main") < events.IndexOf("enumerate Blocks/Logic"),
+            string.Join(", ", events));
     }
 
     [Fact]
@@ -738,44 +745,48 @@ public sealed class PlcExportServiceTests
         public IEnumerable<IPlcExportableObject> EnumerateTagTables() => _tagTables;
     }
 
-    private sealed class FakeCountedPlcSoftware : IPlcSoftwareSource, IPlcSoftwareObjectCounter
+    private sealed class StreamingFakePlcSoftware : IPlcSoftwareSource
     {
-        private readonly FakePlcSoftware _source;
-        private readonly int _count;
-        private readonly bool _countSucceeds;
+        private readonly IReadOnlyList<IPlcExportableObject> _blocks;
+        private readonly IReadOnlyList<IPlcExportableObject> _types;
+        private readonly IReadOnlyList<IPlcExportableObject> _tagTables;
+        private readonly List<string> _events;
 
-        private FakeCountedPlcSoftware(FakePlcSoftware source, int count, bool countSucceeds)
-        {
-            _source = source;
-            _count = count;
-            _countSucceeds = countSucceeds;
-        }
-
-        public static FakeCountedPlcSoftware Create(
-            int count,
-            bool countSucceeds,
+        private StreamingFakePlcSoftware(
             IReadOnlyList<IPlcExportableObject> blocks,
             IReadOnlyList<IPlcExportableObject> types,
-            IReadOnlyList<IPlcExportableObject> tagTables)
+            IReadOnlyList<IPlcExportableObject> tagTables,
+            List<string> events)
         {
-            return new FakeCountedPlcSoftware(FakePlcSoftware.Create(blocks, types, tagTables), count, countSucceeds);
+            _blocks = blocks;
+            _types = types;
+            _tagTables = tagTables;
+            _events = events;
         }
 
-        public bool TryCountObjects(
-            TimeSpan maxElapsed,
-            IExportLogger logger,
-            IProgress<ExportProgress>? progress,
-            out int totalObjects)
+        public static StreamingFakePlcSoftware Create(
+            IReadOnlyList<IPlcExportableObject> blocks,
+            IReadOnlyList<IPlcExportableObject> types,
+            IReadOnlyList<IPlcExportableObject> tagTables,
+            List<string> events)
         {
-            totalObjects = _count;
-            return _countSucceeds;
+            return new StreamingFakePlcSoftware(blocks, types, tagTables, events);
         }
 
-        public IEnumerable<IPlcExportableObject> EnumerateBlocks() => _source.EnumerateBlocks();
+        public IEnumerable<IPlcExportableObject> EnumerateBlocks() => Enumerate(_blocks);
 
-        public IEnumerable<IPlcExportableObject> EnumerateTypes() => _source.EnumerateTypes();
+        public IEnumerable<IPlcExportableObject> EnumerateTypes() => Enumerate(_types);
 
-        public IEnumerable<IPlcExportableObject> EnumerateTagTables() => _source.EnumerateTagTables();
+        public IEnumerable<IPlcExportableObject> EnumerateTagTables() => Enumerate(_tagTables);
+
+        private IEnumerable<IPlcExportableObject> Enumerate(IEnumerable<IPlcExportableObject> objects)
+        {
+            foreach (var item in objects)
+            {
+                _events.Add($"enumerate {item.ObjectPath}");
+                yield return item;
+            }
+        }
     }
 
     private sealed class RecordingProgress : IProgress<ExportProgress>
@@ -790,6 +801,22 @@ public sealed class PlcExportServiceTests
         public void Report(ExportProgress value)
         {
             _updates.Add(value);
+        }
+    }
+
+    private sealed class FakeSemanticModelWriter : ISemanticPlcModelWriter
+    {
+        public string? ExportRoot { get; private set; }
+
+        public SemanticPlcModelWriteResult Write(string exportRoot)
+        {
+            ExportRoot = exportRoot;
+            var result = SemanticPlcModelWriter.GetExpectedResult(exportRoot);
+            Directory.CreateDirectory(Path.GetDirectoryName(result.SqliteFilePath)!);
+            File.WriteAllText(result.SqliteFilePath, string.Empty);
+            File.WriteAllText(result.SchemaFilePath, string.Empty);
+            File.WriteAllText(result.AgentGuideFilePath, string.Empty);
+            return result;
         }
     }
 

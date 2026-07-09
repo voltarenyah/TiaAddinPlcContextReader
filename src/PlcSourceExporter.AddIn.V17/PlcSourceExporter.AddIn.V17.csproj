@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Include="..\PlcSourceExporter.AddInShared\AddInSemanticPlcModelWriter.cs" Link="AddInShared\AddInSemanticPlcModelWriter.cs" />
     <Compile Include="..\PlcSourceExporter.AddInShared\ExportAddInWorkflow.cs" Link="AddInShared\ExportAddInWorkflow.cs" />
     <Compile Include="..\PlcSourceExporter.AddInShared\ExportProgressForm.cs" Link="AddInShared\ExportProgressForm.cs" />
     <Compile Include="..\PlcSourceExporter.AddInShared\ExportProgressWindow.cs" Link="AddInShared\ExportProgressWindow.cs" />
@@ -10,6 +11,10 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="Siemens.Engineering.AddIn">
       <HintPath>C:\Program Files\Siemens\Automation\Portal V17\PublicAPI\V17.AddIn\Siemens.Engineering.AddIn.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Siemens.Engineering.AddIn.Utilities">
+      <HintPath>C:\Program Files\Siemens\Automation\Portal V17\PublicAPI\V17.AddIn\Siemens.Engineering.AddIn.Utilities.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Siemens.Engineering.AddIn.CntxtMn">
@@ -27,9 +32,13 @@
 
   <ItemGroup>
     <SqliteRuntimeDependency Include="$(NuGetPackageRoot)microsoft.data.sqlite.core\8.0.0\lib\netstandard2.0\Microsoft.Data.Sqlite.dll" />
-    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.bundle_e_sqlite3\2.1.6\lib\net461\SQLitePCLRaw.batteries_v2.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.bundle_e_sqlite3\2.1.6\lib\netstandard2.0\SQLitePCLRaw.batteries_v2.dll" />
     <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.core\2.1.6\lib\netstandard2.0\SQLitePCLRaw.core.dll" />
     <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.provider.e_sqlite3\2.1.6\lib\netstandard2.0\SQLitePCLRaw.provider.e_sqlite3.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)system.buffers\4.4.0\lib\netstandard2.0\System.Buffers.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)system.memory\4.5.3\lib\netstandard2.0\System.Memory.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)system.numerics.vectors\4.4.0\lib\netstandard2.0\System.Numerics.Vectors.dll" />
+    <SqliteRuntimeDependency Include="$(NuGetPackageRoot)system.runtime.compilerservices.unsafe\4.5.2\lib\netstandard2.0\System.Runtime.CompilerServices.Unsafe.dll" />
     <SqliteRuntimeDependency Include="$(NuGetPackageRoot)sqlitepclraw.lib.e_sqlite3\2.1.6\runtimes\win-x64\native\e_sqlite3.dll" />
   </ItemGroup>
 

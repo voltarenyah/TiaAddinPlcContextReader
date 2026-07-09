@@ -9,6 +9,7 @@ internal static class ExportAddInWorkflow
         string exportRoot,
         string logFile,
         IExportLogger logger,
+        ISemanticPlcModelWriter semanticModelWriter,
         Func<IProgress<ExportProgress>, IPlcSoftwareSource> createSource,
         Func<IDisposable?> acquireExclusiveAccess)
     {
@@ -24,7 +25,7 @@ internal static class ExportAddInWorkflow
             var source = createSource(progressWindow);
 
             logger.Info("Starting PLC source export");
-            var summary = new PlcExportService().Export(
+            var summary = new PlcExportService(() => DateTimeOffset.UtcNow, semanticModelWriter).Export(
                 source,
                 exportRoot,
                 logger,

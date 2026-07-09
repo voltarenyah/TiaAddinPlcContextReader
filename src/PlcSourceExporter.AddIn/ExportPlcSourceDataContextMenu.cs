@@ -52,8 +52,17 @@ public sealed class ExportPlcSourceDataContextMenu : ContextMenuAddIn
             exportRoot,
             logFile,
             logger,
+            new AddInSemanticPlcModelWriter(GetSemanticModelHelperPath()),
             progress => AddInPlcSoftwareSource.Create(plcSoftware, logger, progress),
             () => TryAcquireExclusiveAccess(deviceItem));
+    }
+
+    private static string GetSemanticModelHelperPath()
+    {
+        return Path.Combine(
+            @"C:\Program Files\Siemens\Automation\Portal V20\AddIns\PlcSourceExporter",
+            "ExportAnalyzer",
+            "PlcSourceExporter.ExportAnalyzer.exe");
     }
 
     private static Project ResolveProject(IEngineeringObject selectedObject)

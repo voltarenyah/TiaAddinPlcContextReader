@@ -1,4 +1,7 @@
 using Microsoft.Data.Sqlite;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security;
 using System.Runtime.Serialization.Json;
 using System.Xml;
 using System.Xml.Linq;
@@ -906,11 +909,8 @@ public static class PlcSemanticGraphSqliteSchema
 
 public static class SqliteSemanticGraphStore
 {
-    private static readonly Lazy<bool> SQLiteInitialized = new(() =>
-    {
-        SQLitePCL.Batteries_V2.Init();
-        return true;
-    });
+    private static readonly object SQLiteInitializationGate = new();
+    private static bool sqliteInitialized;
 
     public static void Save(string dbPath, SemanticPlcGraph graph)
     {
@@ -930,7 +930,7 @@ public static class SqliteSemanticGraphStore
             Directory.CreateDirectory(directory);
         }
 
-        EnsureSqliteInitialized();
+        EnsureSqliteInitialized(dbPath);
         using var connection = new SqliteConnection($"Data Source={dbPath}");
         connection.Open();
         ExecuteNonQuery(connection, "PRAGMA foreign_keys = ON;");
@@ -992,7 +992,7 @@ public static class SqliteSemanticGraphStore
         }
 
         var graph = new SemanticPlcGraph();
-        EnsureSqliteInitialized();
+        EnsureSqliteInitialized(dbPath);
         using var connection = new SqliteConnection($"Data Source={dbPath}");
         connection.Open();
 
@@ -1053,9 +1053,30 @@ public static class SqliteSemanticGraphStore
         return results;
     }
 
-    private static void EnsureSqliteInitialized()
+    private static void EnsureSqliteInitialized(string dbPath)
     {
-        _ = SQLiteInitialized.Value;
+        if (sqliteInitialized)
+        {
+            return;
+        }
+
+        lock (SQLiteInitializationGate)
+        {
+            if (sqliteInitialized)
+            {
+                return;
+            }
+
+            var dbDirectory = Path.GetDirectoryName(Path.GetFullPath(dbPath));
+            if (string.IsNullOrWhiteSpace(dbDirectory))
+            {
+                throw new InvalidOperationException("SQLite database path must resolve to a directory.");
+            }
+
+            NativeSqliteRuntime.EnsureAvailable(Path.Combine(dbDirectory, "runtime", "sqlite", "win-x64"));
+            SQLitePCL.Batteries_V2.Init();
+            sqliteInitialized = true;
+        }
     }
 
     private static void ExecuteNonQuery(SqliteConnection connection, string sql)
@@ -1081,6 +1102,65 @@ public static class SqliteSemanticGraphStore
 
         command.ExecuteNonQuery();
     }
+}
+
+internal static class NativeSqliteRuntime
+{
+    private const string NativeDllName = "e_sqlite3.dll";
+    private const string NativeResourceSuffix = ".e_sqlite3.dll";
+
+    public static void EnsureAvailable(string directory)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(directory);
+        var destination = Path.Combine(directory, NativeDllName);
+        ExtractNativeRuntime(destination);
+        LoadNativeRuntime(destination);
+    }
+
+    private static void ExtractNativeRuntime(string destination)
+    {
+        var assembly = typeof(NativeSqliteRuntime).GetTypeInfo().Assembly;
+        var resourceName = assembly
+            .GetManifestResourceNames()
+            .FirstOrDefault(name => name.EndsWith(NativeResourceSuffix, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(resourceName))
+        {
+            throw new FileNotFoundException("Embedded native SQLite runtime was not found.", NativeDllName);
+        }
+
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            throw new FileNotFoundException("Embedded native SQLite runtime could not be opened.", NativeDllName);
+        }
+
+        var destinationInfo = new FileInfo(destination);
+        if (destinationInfo.Exists && destinationInfo.Length == stream.Length)
+        {
+            return;
+        }
+
+        using var file = File.Create(destination);
+        stream.CopyTo(file);
+    }
+
+    [SecuritySafeCritical]
+    private static void LoadNativeRuntime(string path)
+    {
+        if (LoadLibrary(path) == IntPtr.Zero)
+        {
+            throw new InvalidOperationException($"Unable to load native SQLite runtime from '{path}'. Win32 error {Marshal.GetLastWin32Error()}.");
+        }
+    }
+
+    [SecurityCritical]
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr LoadLibrary(string lpFileName);
 }
 
 public sealed class SemanticPlcModelWriteResult
@@ -1116,16 +1196,28 @@ public static class SemanticPlcModelWriter
         var modelFolder = Path.Combine(exportRoot, ModelFolderName);
         Directory.CreateDirectory(modelFolder);
 
-        var schemaFilePath = Path.Combine(modelFolder, SchemaFileName);
-        File.WriteAllText(schemaFilePath, PlcSemanticGraphSqliteSchema.CreateScript);
+        var result = GetExpectedResult(exportRoot);
+        File.WriteAllText(result.SchemaFilePath, PlcSemanticGraphSqliteSchema.CreateScript);
 
-        var agentGuideFilePath = Path.Combine(modelFolder, AgentGuideFileName);
-        File.WriteAllText(agentGuideFilePath, SemanticPlcGraphAgentGuide.Content);
+        File.WriteAllText(result.AgentGuideFilePath, SemanticPlcGraphAgentGuide.Content);
 
-        var sqliteFilePath = Path.Combine(modelFolder, SqliteFileName);
-        TiaXmlSemanticGraphImporter.WriteSqlite(exportRoot, sqliteFilePath);
+        TiaXmlSemanticGraphImporter.WriteSqlite(exportRoot, result.SqliteFilePath);
 
-        return new SemanticPlcModelWriteResult(sqliteFilePath, schemaFilePath, agentGuideFilePath);
+        return result;
+    }
+
+    public static SemanticPlcModelWriteResult GetExpectedResult(string exportRoot)
+    {
+        if (string.IsNullOrWhiteSpace(exportRoot))
+        {
+            throw new ArgumentException("Export root is required.", nameof(exportRoot));
+        }
+
+        var modelFolder = Path.Combine(exportRoot, ModelFolderName);
+        return new SemanticPlcModelWriteResult(
+            Path.Combine(modelFolder, SqliteFileName),
+            Path.Combine(modelFolder, SchemaFileName),
+            Path.Combine(modelFolder, AgentGuideFileName));
     }
 }
 

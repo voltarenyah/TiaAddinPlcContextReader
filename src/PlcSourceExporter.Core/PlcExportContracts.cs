@@ -9,15 +9,6 @@ public interface IPlcSoftwareSource
     IEnumerable<IPlcExportableObject> EnumerateTagTables();
 }
 
-public interface IPlcSoftwareObjectCounter
-{
-    bool TryCountObjects(
-        TimeSpan maxElapsed,
-        IExportLogger logger,
-        IProgress<ExportProgress>? progress,
-        out int totalObjects);
-}
-
 public interface IPlcExportableObject
 {
     string Name { get; }
@@ -81,6 +72,11 @@ public interface IExportLogger
     void Warning(string message);
 
     void Error(string message);
+}
+
+public interface ISemanticPlcModelWriter
+{
+    SemanticPlcModelWriteResult Write(string exportRoot);
 }
 
 public sealed class NullExportLogger : IExportLogger

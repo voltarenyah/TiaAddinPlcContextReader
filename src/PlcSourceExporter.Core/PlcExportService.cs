@@ -2,19 +2,23 @@ namespace PlcSourceExporter.Core;
 
 public sealed class PlcExportService
 {
-    private static readonly TimeSpan DefaultObjectCountTimeout = TimeSpan.FromSeconds(15);
     private readonly Func<DateTimeOffset> _utcNow;
-    private readonly TimeSpan _objectCountTimeout;
+    private readonly ISemanticPlcModelWriter _semanticModelWriter;
 
     public PlcExportService()
-        : this(() => DateTimeOffset.UtcNow)
+        : this(() => DateTimeOffset.UtcNow, InProcessSemanticPlcModelWriter.Instance)
     {
     }
 
-    public PlcExportService(Func<DateTimeOffset> utcNow, TimeSpan? objectCountTimeout = null)
+    public PlcExportService(Func<DateTimeOffset> utcNow)
+        : this(utcNow, InProcessSemanticPlcModelWriter.Instance)
+    {
+    }
+
+    public PlcExportService(Func<DateTimeOffset> utcNow, ISemanticPlcModelWriter semanticModelWriter)
     {
         _utcNow = utcNow ?? throw new ArgumentNullException(nameof(utcNow));
-        _objectCountTimeout = objectCountTimeout ?? DefaultObjectCountTimeout;
+        _semanticModelWriter = semanticModelWriter ?? throw new ArgumentNullException(nameof(semanticModelWriter));
     }
 
     public ExportSummary Export(
@@ -40,76 +44,39 @@ public sealed class PlcExportService
         logger.Info($"Prepared export folder: {exportRoot}");
 
         cancellationToken.ThrowIfCancellationRequested();
-        var expectedTotalObjects = TryCountObjects(plcSoftware, logger, progress);
-        var discoveredObjects = 0;
-        Report(
-            progress,
-            ExportPhase.EnumeratingObjects,
-            5,
-            expectedTotalObjects.HasValue
-                ? $"Reading metadata for {expectedTotalObjects.Value} PLC software objects"
-                : "Enumerating PLC software objects",
-            completedSteps: 0,
-            totalItems: expectedTotalObjects ?? 0);
-        var blocks = EnumerateWithProgress(
-            plcSoftware.EnumerateBlocks(),
-            "PLC block",
-            ref discoveredObjects,
-            expectedTotalObjects,
-            progress,
-            cancellationToken);
-        var types = EnumerateWithProgress(
-            plcSoftware.EnumerateTypes(),
-            "PLC user data type",
-            ref discoveredObjects,
-            expectedTotalObjects,
-            progress,
-            cancellationToken);
-        var tagTables = EnumerateWithProgress(
-            plcSoftware.EnumerateTagTables(),
-            "PLC tag table",
-            ref discoveredObjects,
-            expectedTotalObjects,
-            progress,
-            cancellationToken);
-        var totalObjects = blocks.Count + types.Count + tagTables.Count;
-        Report(
-            progress,
-            ExportPhase.EnumeratingObjects,
-            15,
-            $"Enumerated {totalObjects} PLC software objects",
-            completedSteps: totalObjects,
-            totalItems: totalObjects);
-        Report(progress, ExportPhase.ExportingObjects, totalObjects == 0 ? 75 : 15, $"Exporting {totalObjects} PLC software objects", totalItems: totalObjects);
-
         var summary = new ExportSummary();
         var planner = new ExportPathPlanner(exportRoot);
         var metadataWriter = new ExportMetadataWriter(exportRoot, _utcNow());
         var completedObjects = 0;
 
-        foreach (var block in blocks)
+        Report(progress, ExportPhase.ExportingObjects, 15, "Exporting PLC software objects", completedSteps: completedObjects);
+
+        foreach (var block in plcSoftware.EnumerateBlocks())
         {
             cancellationToken.ThrowIfCancellationRequested();
             var category = BlockCategoryResolver.ResolveBlockCategory(block.SiemensTypeName, block.Name);
+            ReportCurrentObject(progress, block.ObjectPath, completedObjects);
             ExportOne(block, category, planner, summary, metadataWriter, logger);
             completedObjects++;
-            ReportObjectProgress(progress, block.ObjectPath, completedObjects, totalObjects);
+            ReportObjectProgress(progress, block.ObjectPath, completedObjects);
         }
 
-        foreach (var type in types)
+        foreach (var type in plcSoftware.EnumerateTypes())
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ReportCurrentObject(progress, type.ObjectPath, completedObjects);
             ExportOne(type, ExportCategory.UserDataType, planner, summary, metadataWriter, logger);
             completedObjects++;
-            ReportObjectProgress(progress, type.ObjectPath, completedObjects, totalObjects);
+            ReportObjectProgress(progress, type.ObjectPath, completedObjects);
         }
 
-        foreach (var tagTable in tagTables)
+        foreach (var tagTable in plcSoftware.EnumerateTagTables())
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ReportCurrentObject(progress, tagTable.ObjectPath, completedObjects);
             ExportOne(tagTable, ExportCategory.TagTable, planner, summary, metadataWriter, logger);
             completedObjects++;
-            ReportObjectProgress(progress, tagTable.ObjectPath, completedObjects, totalObjects);
+            ReportObjectProgress(progress, tagTable.ObjectPath, completedObjects);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -123,7 +90,7 @@ public sealed class PlcExportService
         summary.ProgramBlockTranslationFilePath = programBlockTranslation.FilePath;
         logger.Info($"Wrote program block logic translation: {summary.ProgramBlockTranslationFilePath}");
         ReportArtifactProgress(progress, "Writing semantic PLC model", artifactStep++, artifactSteps);
-        var semanticModel = SemanticPlcModelWriter.Write(exportRoot);
+        var semanticModel = _semanticModelWriter.Write(exportRoot);
         summary.SemanticModelSqliteFilePath = semanticModel.SqliteFilePath;
         summary.SemanticModelSchemaFilePath = semanticModel.SchemaFilePath;
         summary.SemanticModelAgentGuideFilePath = semanticModel.AgentGuideFilePath;
@@ -142,94 +109,6 @@ public sealed class PlcExportService
         logger.Info($"Export complete: {summary.SuccessCount} exported, {summary.SkippedCount} skipped, {summary.FailureCount} failed");
         Report(progress, ExportPhase.Completed, 100, $"Export complete: {summary.SuccessCount} exported, {summary.SkippedCount} skipped, {summary.FailureCount} failed");
         return summary;
-    }
-
-    private int? TryCountObjects(
-        IPlcSoftwareSource plcSoftware,
-        IExportLogger logger,
-        IProgress<ExportProgress>? progress)
-    {
-        if (plcSoftware is not IPlcSoftwareObjectCounter counter)
-        {
-            return null;
-        }
-
-        Report(progress, ExportPhase.EnumeratingObjects, 3, "Counting PLC software objects");
-        try
-        {
-            if (counter.TryCountObjects(_objectCountTimeout, logger, progress, out var totalObjects))
-            {
-                totalObjects = Math.Max(0, totalObjects);
-                logger.Info($"Counted PLC software objects before export: {totalObjects}");
-                Report(
-                    progress,
-                    ExportPhase.EnumeratingObjects,
-                    5,
-                    $"Counted {totalObjects} PLC software objects",
-                    completedSteps: 0,
-                    totalItems: totalObjects);
-                return totalObjects;
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Warning($"Unable to count PLC software objects before export: {ExceptionMessages.GetMeaningfulMessage(ex)}");
-        }
-
-        logger.Warning("Unable to count PLC software objects before export; using discovered-count progress.");
-        Report(progress, ExportPhase.EnumeratingObjects, 5, "Counting unavailable; discovering PLC software objects");
-        return null;
-    }
-
-    private static List<IPlcExportableObject> EnumerateWithProgress(
-        IEnumerable<IPlcExportableObject> objects,
-        string objectKind,
-        ref int discoveredObjects,
-        int? expectedTotalObjects,
-        IProgress<ExportProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        var results = new List<IPlcExportableObject>();
-        foreach (var exportable in objects)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            discoveredObjects++;
-            ReportEnumerationProgress(progress, objectKind, exportable.ObjectPath, discoveredObjects, expectedTotalObjects);
-            results.Add(exportable);
-        }
-
-        return results;
-    }
-
-    private static void ReportEnumerationProgress(
-        IProgress<ExportProgress>? progress,
-        string objectKind,
-        string currentItem,
-        int discoveredObjects,
-        int? expectedTotalObjects)
-    {
-        if (expectedTotalObjects is > 0)
-        {
-            var percent = 5 + (int)Math.Round(Math.Min(discoveredObjects, expectedTotalObjects.Value) * 10.0 / expectedTotalObjects.Value);
-            Report(
-                progress,
-                ExportPhase.EnumeratingObjects,
-                percent,
-                $"Read metadata for {discoveredObjects} of {expectedTotalObjects.Value} PLC software objects",
-                currentItem,
-                discoveredObjects,
-                expectedTotalObjects.Value);
-            return;
-        }
-
-        Report(
-            progress,
-            ExportPhase.EnumeratingObjects,
-            5,
-            $"Discovered {discoveredObjects} PLC software objects ({objectKind})",
-            currentItem,
-            discoveredObjects,
-            0);
     }
 
     private static string? ExportOne(
@@ -277,23 +156,34 @@ public sealed class PlcExportService
         }
     }
 
-    private static void ReportObjectProgress(
+    private static void ReportCurrentObject(
         IProgress<ExportProgress>? progress,
         string currentItem,
-        int completedItems,
-        int totalItems)
+        int completedItems)
     {
-        var percent = totalItems == 0
-            ? 75
-            : 15 + (int)Math.Round(completedItems * 60.0 / totalItems);
         Report(
             progress,
             ExportPhase.ExportingObjects,
-            percent,
-            $"Exported {completedItems} of {totalItems} PLC software objects",
+            15,
+            $"Exporting PLC software object {completedItems + 1}",
             currentItem,
             completedItems,
-            totalItems);
+            0);
+    }
+
+    private static void ReportObjectProgress(
+        IProgress<ExportProgress>? progress,
+        string currentItem,
+        int completedItems)
+    {
+        Report(
+            progress,
+            ExportPhase.ExportingObjects,
+            15,
+            $"Exported {completedItems} PLC software objects",
+            currentItem,
+            completedItems,
+            0);
     }
 
     private static void ReportArtifactProgress(

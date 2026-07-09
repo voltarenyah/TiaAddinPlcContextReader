@@ -121,11 +121,11 @@ internal sealed class ExportProgressForm : Form
 
     public void UpdateProgress(ExportProgress progress)
     {
-        if (progress.Phase == ExportPhase.EnumeratingObjects && progress.TotalItems == 0)
+        if (progress.TotalItems == 0 && progress.Phase != ExportPhase.WritingDerivedArtifacts && progress.Phase != ExportPhase.Completed)
         {
             _progressBar.Style = ProgressBarStyle.Marquee;
             _progressBar.MarqueeAnimationSpeed = 30;
-            _percentLabel.Text = "Scanning";
+            _percentLabel.Text = progress.Phase == ExportPhase.ExportingObjects ? "Exporting" : "Working";
         }
         else
         {
@@ -139,11 +139,19 @@ internal sealed class ExportProgressForm : Form
         _currentItemLabel.Text = string.IsNullOrWhiteSpace(progress.CurrentItem)
             ? "Current item: -"
             : $"Current item: {progress.CurrentItem}";
-        _countsLabel.Text = progress.TotalItems > 0
-            ? $"Items: {progress.CompletedItems} / {progress.TotalItems}"
-            : progress.CompletedItems > 0
-                ? $"Discovered: {progress.CompletedItems}"
-                : "Items: -";
+        if (progress.TotalItems > 0)
+        {
+            _countsLabel.Text = $"Items: {progress.CompletedItems} / {progress.TotalItems}";
+        }
+        else if (progress.Phase == ExportPhase.ExportingObjects)
+        {
+            _countsLabel.Text = $"Exported: {progress.CompletedItems}";
+        }
+        else
+        {
+            _countsLabel.Text = "Items: -";
+        }
+
         AddDetail(progress.Message);
     }
 
