@@ -5,3 +5,5 @@
 package/*.publisher.log
 package/*report.json
 package/*.install-status.txt
+package/release/
+package/*.zip
