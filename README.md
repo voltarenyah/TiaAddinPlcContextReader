@@ -4,6 +4,46 @@ TIA Portal add-in and export tooling for reading PLC project context into source
 
 The implementation project is named `PlcSourceExporter`. It provides TIA Portal V17 and V20 add-ins, console harnesses, and shared export logic for PLC source context extraction.
 
+## Install for TIA V17
+
+These steps assume Siemens TIA Portal V17 is already installed on the PC.
+
+The recommended GitHub release should contain:
+
+- `PlcSourceExporter.V17.addin`
+- `install-v17-addin.ps1`
+- `ExportAnalyzer\PlcSourceExporter.ExportAnalyzer.exe` and the helper files in the same folder
+
+Install target:
+
+```text
+C:\Program Files\Siemens\Automation\Portal V17\AddIns\PlcSourceExporter\PlcSourceExporter.V17.addin
+```
+
+Helper target:
+
+```text
+C:\Program Files\Siemens\Automation\Portal V17\AddIns\PlcSourceExporter\ExportAnalyzer\
+```
+
+### Option 1: Recommended
+
+Open PowerShell as Administrator in the extracted release folder and run:
+
+```powershell
+.\install-v17-addin.ps1
+```
+
+### Option 2: Manual install
+
+1. Create `C:\Program Files\Siemens\Automation\Portal V17\AddIns\PlcSourceExporter\` if it does not already exist.
+2. Copy `PlcSourceExporter.V17.addin` into that folder.
+3. Copy the full `ExportAnalyzer` folder from the release into `C:\Program Files\Siemens\Automation\Portal V17\AddIns\PlcSourceExporter\`.
+4. Restart TIA Portal V17.
+5. Enable the add-in if TIA prompts for confirmation.
+
+After installation, open a project, right-click a PLC or device item in the project tree, and run `Export PLC Source Data`.
+
 ## What It Does
 
 - Adds an `Export PLC Source Data` context-menu command inside TIA Portal.
@@ -158,6 +198,14 @@ Package V17 with the V17 Add-In Publisher and install the produced package separ
 New-Item -ItemType Directory -Force "C:\Program Files\Siemens\Automation\Portal V17\AddIns\PlcSourceExporter"
 Copy-Item ".\package\PlcSourceExporter.V17.addin" "C:\Program Files\Siemens\Automation\Portal V17\AddIns\PlcSourceExporter\PlcSourceExporter.V17.addin" -Force
 ```
+
+The V17 add-in also starts a helper executable from:
+
+```text
+C:\Program Files\Siemens\Automation\Portal V17\AddIns\PlcSourceExporter\ExportAnalyzer\PlcSourceExporter.ExportAnalyzer.exe
+```
+
+If you are preparing a GitHub release for end users, publish the `.addin` package together with the matching `ExportAnalyzer` helper folder and `install-v17-addin.ps1`.
 
 Package V20 with the V20 Add-In Publisher and install it only under the V20 AddIns folder:
 
