@@ -1,0 +1,15 @@
+example: cylinder_extend_interlock
+summary: Extend command is blocked unless retract feedback is confirmed and fault is absent.
+source_shape:
+  conditions:
+    - ExtendCmd
+    - RetractPosFb
+    - NOT CylinderFault
+  output:
+    id: coil
+    destination: ExtendSolenoidCmd
+logic_interpretation:
+  - Extend command is only permitted when the cylinder is confirmed retracted and no fault is active.
+  - RetractPosFb acts as an interlock or readiness confirmation depending on machine design.
+do_not_assume:
+  - Do not label this as a safety function without stronger evidence.

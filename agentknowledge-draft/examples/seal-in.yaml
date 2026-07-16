@@ -1,0 +1,16 @@
+example: motor_start_latch
+summary: A momentary start command latches a run request until stop or fault clears it.
+source_shape:
+  conditions:
+    - StartPb OR MotorRunReq
+    - NOT StopPb
+    - NOT MotorFault
+  output:
+    id: coil
+    destination: MotorRunReq
+logic_interpretation:
+  - StartPb can initiate the run request.
+  - MotorRunReq feeds back to keep itself true.
+  - StopPb or MotorFault breaks the holding path.
+do_not_assume:
+  - Do not confuse this with direct output drive to a motor contactor.

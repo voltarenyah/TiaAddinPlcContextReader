@@ -1,0 +1,26 @@
+version: 0.1-draft
+rules:
+  - topic: safety_boundary
+    guidance:
+      - Do not simplify safety-related logic into ordinary permissive logic unless the source explicitly shows it is standard control logic.
+      - E-stop, gate, STO, and safety acknowledge semantics must be treated as high-risk areas.
+  - topic: interlocks
+    guidance:
+      - An interlock usually blocks an action when a hazardous or invalid condition exists.
+      - Do not remove or invert an interlock explanation casually.
+  - topic: diagnostics
+    guidance:
+      - Alarm, fault, warning, and inhibit are different states.
+      - A reset path does not prove automatic recovery is safe.
+  - topic: manual_auto
+    guidance:
+      - Manual mode, auto mode, and service mode should be kept distinct.
+      - Do not claim an operator command bypasses protection without proof.
+  - topic: simulation_and_force
+    guidance:
+      - Forced bits, simulated feedback, and bypasses must be called out explicitly.
+      - Do not present simulated behavior as machine truth.
+  - topic: output_commands
+    guidance:
+      - A command bit is not proof that the actuator moved.
+      - Separate command from feedback and fault confirmation.

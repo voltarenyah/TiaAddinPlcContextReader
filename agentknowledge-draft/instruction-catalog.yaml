@@ -1,0 +1,370 @@
+version: 0.1-draft
+scope: Generic Siemens PLC instruction semantics for AI reasoning
+instructions:
+  - id: contact_no
+    title: Contact (NO)
+    aliases: [Contact, NO Contact, Normally Open Contact, examine_if_closed]
+    languages: [LAD]
+    category: boolean_condition
+    purpose: Evaluates true when the referenced operand is true.
+    inputs:
+      - name: operand
+        type: BOOL
+    outputs:
+      - name: result
+        type: BOOL
+    state: []
+    semantics:
+      - The contact passes power flow when operand is true.
+      - It does not latch by itself.
+      - It is a condition element, not an output.
+    do_not_assume:
+      - Do not assume the operand is a physical input.
+      - Do not assume a contact means edge detection.
+    common_patterns: [permissive, interlock, mode gate, feedback check]
+
+  - id: contact_nc
+    title: Contact (NC)
+    aliases: [NC Contact, Normally Closed Contact, negated_contact, examine_if_open]
+    languages: [LAD]
+    category: boolean_condition
+    purpose: Evaluates true when the referenced operand is false.
+    inputs:
+      - name: operand
+        type: BOOL
+    outputs:
+      - name: result
+        type: BOOL
+    state: []
+    semantics:
+      - The contact passes power flow when operand is false.
+      - It is logical negation at the rung condition level.
+    do_not_assume:
+      - Do not assume the field device is normally closed in wiring.
+      - Do not infer fail-safe design from the symbol alone.
+    common_patterns: [not_fault, not_busy, not_alarm, release_condition]
+
+  - id: coil
+    title: Coil
+    aliases: [Coil, Output Coil, Assign Coil]
+    languages: [LAD]
+    category: assignment
+    purpose: Writes the rung result to a BOOL destination.
+    inputs:
+      - name: rung_result
+        type: BOOL
+    outputs:
+      - name: destination
+        type: BOOL
+    state: []
+    semantics:
+      - The destination is true when the rung result is true.
+      - The destination is false when the rung result is false, unless a different coil type is used.
+    do_not_assume:
+      - Do not assume the destination is hardware output.
+      - Do not assume latching behavior.
+    common_patterns: [command_bit, internal_enable, output_drive]
+
+  - id: set
+    title: Set
+    aliases: [S, Set Coil, Latch Set]
+    languages: [LAD, FBD]
+    category: latch
+    purpose: Sets a BOOL destination true until reset logic clears it.
+    inputs:
+      - name: enable
+        type: BOOL
+    outputs:
+      - name: destination
+        type: BOOL
+    state:
+      - latched_destination
+    semantics:
+      - When enable is true, destination becomes true.
+      - Destination remains true after enable goes false until another reset path clears it.
+    do_not_assume:
+      - Do not assume the reset is in the same network.
+      - Do not assume the latch is safe to simplify into direct assignment.
+    common_patterns: [fault_latch, start_latch, request_memory]
+
+  - id: reset
+    title: Reset
+    aliases: [R, Reset Coil, Latch Reset]
+    languages: [LAD, FBD]
+    category: latch
+    purpose: Clears a BOOL destination false.
+    inputs:
+      - name: enable
+        type: BOOL
+    outputs:
+      - name: destination
+        type: BOOL
+    state:
+      - latched_destination
+    semantics:
+      - When enable is true, destination becomes false.
+      - Commonly paired with Set or SR/RS logic.
+    do_not_assume:
+      - Do not assume reset dominates unless source structure proves it.
+    common_patterns: [fault_reset, stop_reset, request_clear]
+
+  - id: ton
+    title: TON
+    aliases: [TON, OnDelayTimer, IEC_TON]
+    languages: [LAD, FBD, SCL]
+    category: timer
+    purpose: Delays Q becoming true until IN has remained true for PT.
+    inputs:
+      - name: IN
+        type: BOOL
+      - name: PT
+        type: TIME
+    outputs:
+      - name: Q
+        type: BOOL
+      - name: ET
+        type: TIME
+    state:
+      - elapsed_time
+      - internal_timer_instance
+    semantics:
+      - When IN becomes true, elapsed timing starts.
+      - Q becomes true only after elapsed time reaches PT.
+      - If IN becomes false before PT expires, ET resets and Q becomes false.
+    do_not_assume:
+      - Do not treat PT as scan count.
+      - Do not assume ET is retained across restart.
+      - Do not assume TON means debounce without surrounding context.
+    common_patterns: [startup_delay, debounce, timeout_prep]
+
+  - id: tof
+    title: TOF
+    aliases: [TOF, OffDelayTimer, IEC_TOF]
+    languages: [LAD, FBD, SCL]
+    category: timer
+    purpose: Keeps Q true for PT after IN goes false.
+    inputs:
+      - name: IN
+        type: BOOL
+      - name: PT
+        type: TIME
+    outputs:
+      - name: Q
+        type: BOOL
+      - name: ET
+        type: TIME
+    state:
+      - elapsed_time
+    semantics:
+      - Q follows IN true immediately.
+      - After IN goes false, Q remains true until PT expires.
+    do_not_assume:
+      - Do not assume it is a safety hold circuit.
+    common_patterns: [delayed_release, output_hold, purge_delay]
+
+  - id: tp
+    title: TP
+    aliases: [TP, PulseTimer, IEC_TP]
+    languages: [LAD, FBD, SCL]
+    category: timer
+    purpose: Generates a timed pulse when triggered.
+    inputs:
+      - name: IN
+        type: BOOL
+      - name: PT
+        type: TIME
+    outputs:
+      - name: Q
+        type: BOOL
+      - name: ET
+        type: TIME
+    state:
+      - pulse_state
+    semantics:
+      - A qualifying trigger starts a pulse of duration PT.
+      - Q remains true during the pulse window.
+    do_not_assume:
+      - Do not assume every scan with IN true retriggers identically.
+    common_patterns: [one_pulse, trigger_stretch, actuator_pulse]
+
+  - id: move
+    title: MOVE
+    aliases: [MOVE, Move, Assign]
+    languages: [LAD, FBD, SCL]
+    category: data_transfer
+    purpose: Copies a source value into a destination.
+    inputs:
+      - name: IN
+        type: ANY
+    outputs:
+      - name: OUT
+        type: ANY
+    state: []
+    semantics:
+      - The destination receives the current source value when the instruction executes.
+      - It is assignment, not accumulation.
+    do_not_assume:
+      - Do not assume type conversion is harmless.
+      - Do not assume destination is only written here.
+    common_patterns: [setpoint_transfer, mode_value_select, command_forwarding]
+
+  - id: compare
+    title: Compare
+    aliases: [CMP, EQ, NE, GT, GE, LT, LE]
+    languages: [LAD, FBD, SCL]
+    category: comparison
+    purpose: Produces a boolean result from comparing values.
+    inputs:
+      - name: left
+        type: ANY
+      - name: right
+        type: ANY
+    outputs:
+      - name: result
+        type: BOOL
+    state: []
+    semantics:
+      - The result depends on the selected comparison operator.
+      - Commonly used as a permissive, limit check, or state decision.
+    do_not_assume:
+      - Do not assume engineering units from the operator alone.
+      - Do not assume hysteresis unless extra logic exists.
+    common_patterns: [limit_check, mode_branch, alarm_threshold]
+
+  - id: math_basic
+    title: Basic Math
+    aliases: [ADD, SUB, MUL, DIV]
+    languages: [LAD, FBD, SCL]
+    category: arithmetic
+    purpose: Computes a new numeric value from one or more inputs.
+    inputs:
+      - name: operands
+        type: NUMERIC
+    outputs:
+      - name: result
+        type: NUMERIC
+    state: []
+    semantics:
+      - Produces a deterministic numeric output from current input values.
+    do_not_assume:
+      - Do not assume scaling or units are obvious.
+      - Do not ignore overflow, truncation, or integer division risk.
+    common_patterns: [scaling, offset, derived_setpoint, counter_calc]
+
+  - id: ctu
+    title: CTU
+    aliases: [CTU, CountUp]
+    languages: [LAD, FBD, SCL]
+    category: counter
+    purpose: Counts qualifying events upward.
+    inputs:
+      - name: CU
+        type: BOOL
+      - name: R
+        type: BOOL
+      - name: PV
+        type: INT
+    outputs:
+      - name: CV
+        type: INT
+      - name: Q
+        type: BOOL
+    state:
+      - current_count
+    semantics:
+      - Counter state changes on qualifying count events.
+      - Reset clears the current count.
+      - Q usually reflects count reached or exceeded preset.
+    do_not_assume:
+      - Do not assume level-sensitive counting.
+    common_patterns: [piece_count, retry_count, event_limit]
+
+  - id: ctud
+    title: CTD
+    aliases: [CTD, CountDown]
+    languages: [LAD, FBD, SCL]
+    category: counter
+    purpose: Counts qualifying events downward.
+    inputs:
+      - name: CD
+        type: BOOL
+      - name: LD
+        type: BOOL
+      - name: PV
+        type: INT
+    outputs:
+      - name: CV
+        type: INT
+      - name: Q
+        type: BOOL
+    state:
+      - current_count
+    semantics:
+      - Load initializes the counter.
+      - Count events decrement current value.
+    do_not_assume:
+      - Do not assume Q polarity without source context.
+    common_patterns: [remaining_steps, retries_left, batch_balance]
+
+  - id: edge_rise
+    title: Rising Edge Detection
+    aliases: [R_TRIG, P_TRIG, positive_edge, one_shot_rise]
+    languages: [LAD, FBD, SCL]
+    category: edge_detection
+    purpose: Produces a short true result when a signal changes from false to true.
+    inputs:
+      - name: CLK
+        type: BOOL
+    outputs:
+      - name: Q
+        type: BOOL
+    state:
+      - previous_clk
+    semantics:
+      - Q is true for one execution cycle when CLK transitions from false to true.
+    do_not_assume:
+      - Do not confuse with a sustained true permissive.
+    common_patterns: [start_pulse, event_capture, count_trigger]
+
+  - id: edge_fall
+    title: Falling Edge Detection
+    aliases: [F_TRIG, negative_edge, one_shot_fall]
+    languages: [LAD, FBD, SCL]
+    category: edge_detection
+    purpose: Produces a short true result when a signal changes from true to false.
+    inputs:
+      - name: CLK
+        type: BOOL
+    outputs:
+      - name: Q
+        type: BOOL
+    state:
+      - previous_clk
+    semantics:
+      - Q is true for one execution cycle when CLK transitions from true to false.
+    do_not_assume:
+      - Do not confuse with contact negation.
+    common_patterns: [release_pulse, stop_capture, reset_trigger]
+
+  - id: fb_call
+    title: Function Block Call
+    aliases: [FB Call, Box Call, Call]
+    languages: [LAD, FBD, SCL]
+    category: block_invocation
+    purpose: Executes encapsulated logic with persistent instance state when called as an FB.
+    inputs:
+      - name: formal_parameters
+        type: MIXED
+    outputs:
+      - name: formal_parameters
+        type: MIXED
+    state:
+      - instance_db
+    semantics:
+      - The FB executes according to current parameter values and its stored instance state.
+      - STAT variables persist in the instance DB.
+    do_not_assume:
+      - Do not assume all outputs are written each scan.
+      - Do not assume behavior from the block name alone.
+      - Inspect the instance DB and parameter directions when possible.
+    common_patterns: [device_wrapper, sequence_step, motion_axis_control]

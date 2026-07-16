@@ -1,0 +1,16 @@
+example: move_recipe_setpoint
+summary: Copy a recipe value into the active speed setpoint while in auto mode.
+source_shape:
+  conditions:
+    - AutoMode = true
+  instruction:
+    id: move
+    inputs:
+      IN: Recipe.SpeedSetpoint
+    outputs:
+      OUT: Axis.SpeedCmd
+logic_interpretation:
+  - When AutoMode path executes, the current recipe speed is assigned to the commanded speed target.
+  - This is assignment, not averaging or accumulation.
+do_not_assume:
+  - Do not assume Axis.SpeedCmd is only written here.

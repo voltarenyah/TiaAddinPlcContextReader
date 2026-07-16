@@ -1,0 +1,18 @@
+example: ton_startup_delay
+summary: Delay motor enable until upstream ready remains true for 2 seconds.
+source_shape:
+  conditions:
+    - UpstreamReady = true
+  instruction:
+    id: ton
+    inputs:
+      IN: UpstreamReady
+      PT: T#2s
+    outputs:
+      Q: StartupDelayDone
+logic_interpretation:
+  - Timer starts when UpstreamReady becomes true.
+  - StartupDelayDone becomes true only after 2 seconds of continuous true input.
+  - If UpstreamReady drops false early, the delay resets.
+do_not_assume:
+  - Do not call this debounce unless the source context is noisy input filtering.

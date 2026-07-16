@@ -1,0 +1,87 @@
+version: 0.1-draft
+types:
+  primitive:
+    - name: BOOL
+      meaning: Single boolean value.
+      common_use: state bit, command, feedback, alarm
+    - name: BYTE
+      meaning: 8-bit unsigned container.
+      common_use: packed flags, raw IO
+    - name: WORD
+      meaning: 16-bit unsigned container.
+      common_use: status words, bit fields
+    - name: DWORD
+      meaning: 32-bit unsigned container.
+      common_use: status aggregates, packed values
+    - name: INT
+      meaning: 16-bit signed integer.
+      common_use: counters, indices, small numeric process values
+    - name: DINT
+      meaning: 32-bit signed integer.
+      common_use: counts, identifiers, larger process values
+    - name: REAL
+      meaning: Floating point value.
+      common_use: analog engineering values, scaling
+    - name: TIME
+      meaning: Duration value.
+      common_use: timer preset, elapsed time
+    - name: DATE_AND_TIME
+      meaning: Timestamp value.
+      common_use: event time, logging
+  composite:
+    - name: ARRAY
+      meaning: Ordered repeated elements.
+      notes:
+        - Index bounds matter.
+        - Do not assume zero-based indexing without source proof.
+    - name: STRUCT
+      meaning: Named member group.
+    - name: UDT
+      meaning: User-defined reusable type.
+      notes:
+        - Member naming often carries process intent.
+        - UDT identity alone does not prove behavior.
+
+memory_objects:
+  - object: OB
+    role: Organization block that defines an entry point and scheduling context.
+    persistence: No dedicated persistent data by itself.
+  - object: FC
+    role: Function with temporary local memory only.
+    persistence: No instance memory unless external DBs are used.
+  - object: FB
+    role: Function block with instance state.
+    persistence: STAT data persists in its instance DB.
+  - object: DB
+    role: Data block holding global or instance data.
+    persistence: Depends on CPU and retain configuration.
+  - object: Instance DB
+    role: State storage for an FB call instance.
+    persistence: Holds STAT and call-specific retained values.
+
+parameter_classes:
+  - name: IN
+    meaning: Read-only input from caller into block logic.
+    caution: Current block should not rely on writing back through IN.
+  - name: OUT
+    meaning: Value produced by the block for the caller.
+    caution: OUT may be conditionally written.
+  - name: IN_OUT
+    meaning: Caller-owned value passed by reference-like semantics.
+    caution: Treat as both readable and writable.
+  - name: TEMP
+    meaning: Temporary local storage for one execution.
+    caution: Not persistent across calls.
+  - name: STAT
+    meaning: Static FB internal storage.
+    caution: Persistent per instance and critical for stateful behavior.
+
+retention_rules:
+  - Retain behavior is a runtime configuration topic, not something the instruction symbol alone proves.
+  - Timers, counters, and FB state should be treated as stateful, but reboot persistence still depends on project configuration.
+  - Do not describe a signal as remembered after power cycle unless the source or configuration proves it.
+
+analysis_guidance:
+  - Distinguish a tag address from a logical role.
+  - Distinguish instance state from temporary computed values.
+  - If a value is in an instance DB, inspect the owning FB before summarizing meaning.

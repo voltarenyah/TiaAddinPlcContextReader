@@ -1,0 +1,35 @@
+version: 0.1-draft
+mappings:
+  - concept: ladder_contact
+    source_forms: [LAD contact, boolean input leg]
+    semantic_meaning: Boolean condition in a power-flow style representation.
+    caution: Contact polarity is logical, not automatically wiring semantics.
+  - concept: ladder_coil
+    source_forms: [LAD coil]
+    semantic_meaning: Boolean destination driven by rung result.
+    caution: Coil does not imply physical output.
+  - concept: branch
+    source_forms: [parallel branch, rung branch]
+    semantic_meaning: Alternative or combined logical path inside one network.
+    caution: Not thread parallelism.
+  - concept: box_call
+    source_forms: [instruction box, FB call, FC call]
+    semantic_meaning: Invocation of a typed function or function block.
+    caution: Parameter direction matters.
+  - concept: scl_assignment
+    source_forms: [:=]
+    semantic_meaning: Direct value assignment.
+    caution: Can be the SCL equivalent of a coil or MOVE depending on context.
+  - concept: enable_path
+    source_forms: [EN, ENO, call enable]
+    semantic_meaning: Execution qualification path for a box or call.
+    caution: Missing enable semantics can make a translated summary wrong.
+  - concept: negated_condition
+    source_forms: [NC contact, NOT expression]
+    semantic_meaning: Logical inversion of the underlying condition.
+    caution: Do not confuse with falling-edge detection.
+
+translation_notes:
+  - LAD and FBD are graphical but should be normalized into explicit conditions, assignments, calls, and state transitions for AI reasoning.
+  - SCL can express the same behavior more compactly, but one SCL line does not prove source language was SCL.
+  - Export XML tag names may be structural rather than semantic. Prefer canonical instruction ids from `instruction-catalog.yaml`.

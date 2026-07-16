@@ -1,0 +1,28 @@
+version: 0.1-draft
+terms:
+  - term: permissive
+    definition: A condition that must be acceptable before an action is allowed.
+  - term: interlock
+    definition: Logic that blocks an action when another condition makes it unsafe or invalid.
+  - term: seal_in
+    definition: A self-holding logic pattern that keeps a state active after the initial trigger disappears.
+  - term: one_shot
+    definition: A pulse that is true for one execution cycle on a detected edge.
+  - term: instance_db
+    definition: The data block that stores persistent state for one FB instance.
+  - term: retentive
+    definition: Data behavior that preserves value beyond ordinary scan-to-scan execution; reboot persistence still depends on configuration.
+  - term: watchdog
+    definition: A supervision mechanism that detects timeout or missing expected activity.
+  - term: command
+    definition: A requested action, not proof the physical action completed.
+  - term: feedback
+    definition: A reported state or confirmation from process logic or hardware.
+  - term: setpoint
+    definition: Target value commanded for a process or axis.
+  - term: process_value
+    definition: Measured or current value from the process.
+  - term: manual_mode
+    definition: Operator-driven mode with direct action requests, usually still bounded by protection logic.
+  - term: auto_mode
+    definition: Sequence-driven or automatic operating mode.

@@ -1,0 +1,23 @@
+version: 0.1-draft
+status: placeholder
+notes:
+  - Fill this file per exported project before bundling into production exports.
+  - Project-specific conventions are often more important than generic instruction semantics.
+
+fields_to_define:
+  - key: naming.command_suffixes
+    example: [Cmd, Req, StartCmd, StopCmd]
+  - key: naming.feedback_suffixes
+    example: [Fb, Fbk, Done, Ready]
+  - key: naming.fault_suffixes
+    example: [Fault, Alm, Err, Trip]
+  - key: naming.mode_suffixes
+    example: [Auto, Manual, Jog, Homing]
+  - key: logic.active_low_conventions
+    example: [DoorClosedNc, SafeOkNc]
+  - key: motion.axis_wrapper_blocks
+    example: [AxisControl, ServoUnit, CylinderCtrl]
+  - key: safety.boundary_rules
+    example: [Safety tags never interpreted from names alone]
+  - key: writeback.review_policy
+    example: [AI proposes changes, human reviews, deterministic patcher applies source changes]
