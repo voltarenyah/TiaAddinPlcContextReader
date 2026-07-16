@@ -62,6 +62,10 @@ public sealed class SemanticPlcGraphTests
 
         Assert.Equal(SemanticNodeKind.OrganizationBlock, graph.GetNode("block:Main").Kind);
         Assert.Equal(SemanticNodeKind.Network, graph.GetNode("network:Main:1").Kind);
+        Assert.Equal(
+            "FC_StartCell(I_Enable := Cell_DB.Enable, O_Command => Cell_DB.Command);",
+            graph.GetNode("network:Main:1").Properties["logicStatements"]);
+        Assert.False(graph.GetNode("network:Main:2").Properties.ContainsKey("logicStatements"));
         Assert.Equal(SemanticNodeKind.Function, graph.GetNode("block:FC_StartCell").Kind);
         Assert.Equal(SemanticNodeKind.Variable, graph.GetNode("symbol:Cell_DB.Enable").Kind);
 
@@ -250,7 +254,16 @@ public sealed class SemanticPlcGraphTests
             Path.Combine(root, "Blocks", "Main.xml"),
             """
             <Document><SW.Blocks.OB ID="0"><AttributeList><Name>Main</Name><ProgrammingLanguage>LAD</ProgrammingLanguage></AttributeList><ObjectList>
-              <SW.Blocks.CompileUnit ID="1"><AttributeList><ProgrammingLanguage>LAD</ProgrammingLanguage></AttributeList></SW.Blocks.CompileUnit>
+              <SW.Blocks.CompileUnit ID="1"><AttributeList><NetworkSource><FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                <Parts>
+                  <Access Scope="GlobalVariable" UId="21"><Symbol><Component Name="CellDB" /><Component Name="Ready" /></Symbol></Access>
+                  <Part Name="Coil" UId="22" />
+                </Parts>
+                <Wires>
+                  <Wire UId="23"><Powerrail /><NameCon UId="22" Name="in" /></Wire>
+                  <Wire UId="24"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                </Wires>
+              </FlgNet></NetworkSource><ProgrammingLanguage>LAD</ProgrammingLanguage></AttributeList></SW.Blocks.CompileUnit>
             </ObjectList></SW.Blocks.OB></Document>
             """);
         File.WriteAllText(
@@ -286,5 +299,6 @@ public sealed class SemanticPlcGraphTests
         Assert.Equal(SemanticNodeKind.UserDataType, graph.GetNode("udt:UDT_Cell").Kind);
         Assert.Equal(SemanticNodeKind.PlcTag, graph.GetNode("tag:Default tags:CellReady:%I0.0").Kind);
         Assert.Equal(SemanticNodeKind.GlobalDataBlock, loaded.GetNode("db:CellDB").Kind);
+        Assert.Equal("CellDB.Ready := TRUE;", loaded.GetNode("network:Main:1").Properties["logicStatements"]);
     }
 }

@@ -276,22 +276,30 @@ public static class TiaXmlSemanticGraphImporter
             }));
 
         var parsed = ProgramSemanticReferenceBuilder.Parse(xml, component);
+        var logicStatementsByCompileUnitId = ProgramBlockLogicYamlWriter.GetNetworkStatementTextByCompileUnitId(xml, component);
         ProgramNetworkRecord? previousNetwork = null;
         foreach (var network in parsed.Networks)
         {
+            var networkProperties = new Dictionary<string, string>
+            {
+                ["block"] = network.Block,
+                ["language"] = network.Language,
+                ["title"] = network.Title,
+                ["networkIndex"] = network.NetworkIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["compileUnitId"] = network.CompileUnitId,
+                ["sourceFile"] = network.SourceFile
+            };
+            if (logicStatementsByCompileUnitId.TryGetValue(network.CompileUnitId, out var logicStatements) &&
+                !string.IsNullOrWhiteSpace(logicStatements))
+            {
+                networkProperties["logicStatements"] = logicStatements;
+            }
+
             graph.UpsertNode(new SemanticGraphNode(
                 network.Id,
                 SemanticNodeKind.Network,
                 $"{component.Name} Network {network.NetworkIndex}",
-                new Dictionary<string, string>
-                {
-                    ["block"] = network.Block,
-                    ["language"] = network.Language,
-                    ["title"] = network.Title,
-                    ["networkIndex"] = network.NetworkIndex.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    ["compileUnitId"] = network.CompileUnitId,
-                    ["sourceFile"] = network.SourceFile
-                }));
+                networkProperties));
             AddEdge(graph, blockId, network.Id, SemanticRelationshipType.Contains, new Dictionary<string, string>
             {
                 ["sourceFile"] = network.SourceFile
@@ -1243,6 +1251,8 @@ public static class SemanticPlcGraphAgentGuide
 
         Folder paths are metadata only. Do not infer engineering semantics from folder structure. Prefer relationships in `graph_edges`.
 
+        Network nodes may have a `logicStatements` property. This is newline-delimited translated network logic from `translate\program-blocks.yaml` statements only, stored as plain text for quick agent inspection. Empty networks do not have this property.
+
         ## Schema
 
         ```sql
@@ -1308,6 +1318,21 @@ public static class SemanticPlcGraphAgentGuide
           AND block.kind IN ('OB', 'FB', 'FC')
           AND network.kind = 'Network'
         ORDER BY block.name, CAST(idx.value AS INTEGER);
+        ```
+
+        Search translated network logic:
+
+        ```sql
+        SELECT
+          network.id,
+          network.name,
+          logic.value AS logic_statements
+        FROM graph_nodes network
+        JOIN graph_node_properties logic
+          ON logic.node_id = network.id AND logic.name = 'logicStatements'
+        WHERE network.kind = 'Network'
+          AND logic.value LIKE '%Time_Base%'
+        ORDER BY network.id;
         ```
 
         ## Call Graph

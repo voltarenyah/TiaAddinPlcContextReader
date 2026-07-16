@@ -56,6 +56,23 @@ public static class ProgramBlockLogicYamlWriter
             blocks.Sum(block => block.Networks.Count));
     }
 
+    public static IReadOnlyDictionary<string, string> GetNetworkStatementTextByCompileUnitId(string xml, ProgramBlockComponent component)
+    {
+        if (component == null)
+        {
+            throw new ArgumentNullException(nameof(component));
+        }
+
+        var block = ParseBlock(xml, component);
+        return block.Networks
+            .Where(network => !string.IsNullOrWhiteSpace(network.CompileUnitId) && network.Statements.Count > 0)
+            .GroupBy(network => network.CompileUnitId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => string.Join("\n", group.First().Statements),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
     private static LogicBlock ParseBlock(string xml, ProgramBlockComponent component)
     {
         XDocument document;

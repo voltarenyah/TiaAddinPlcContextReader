@@ -66,9 +66,10 @@ program-blocks.yaml
 
 When answering PLC questions from this export:
 
-- use `model\plc-graph.sqlite` first for objects, reads, writes, calls, DBs, tags, and relationships
+- use `model\plc-graph.sqlite` first for objects, reads, writes, calls, DBs, tags, relationships, and translated network statements
 - use `model\AGENT_SQLITE_GUIDE.md` when an agent only has the SQLite model
-- use `translate\program-blocks.yaml` only when exact network logic, contact polarity, branch grouping, constants, assignments, comparisons, or call enable logic is needed
+- use the `logicStatements` property on SQLite `Network` nodes for quick exact translated network logic
+- use `translate\program-blocks.yaml` when a human-readable full translation artifact, confidence, or notes are needed
 - use `block-profiles.jsonl` for compact block-level summaries
 - use `optimization-hints.jsonl` only as a review lead list
 - use raw XML only as final proof when `translate\program-blocks.yaml` marks a network as `partial` or `untranslated`
@@ -84,7 +85,7 @@ For most questions, read files in this order:
 2. `model\AGENT_SQLITE_GUIDE.md`
 3. `block-profiles.jsonl`
 4. `optimization-hints.jsonl`
-5. `translate\program-blocks.yaml` when exact network logic is needed
+5. `translate\program-blocks.yaml` when translation confidence, notes, or a full readable dump are needed
 6. `metadata.json`
 7. raw XML in `Blocks\`, `DB\`, `UDT\`, or `Tags\`
 
@@ -101,6 +102,7 @@ Good for:
 - querying blocks, networks, variables, DBs, UDTs, tags, types, and IO addresses through one model
 - answering caller/callee, read/write, type, instance, and connectivity questions
 - finding source files and network indices for semantic facts
+- inspecting exact translated network statements from `Network` node property `logicStatements`
 - building future AI analysis and code-generation features without depending on XML shape
 
 The database uses generic graph tables:
@@ -133,7 +135,7 @@ Do not use it as a logic summary. It is only export inventory and metadata.
 
 ### `translate\program-blocks.yaml`
 
-Use this only as the compact network-logic layer.
+Use this as the full compact network-logic mirror when a readable file is more convenient than SQLite.
 
 Good for:
 
@@ -142,7 +144,7 @@ Good for:
 - inspecting SCL source text preserved compactly when available
 - finding whether a network translation is `exact`, `partial`, or `untranslated`
 
-Do not use it as a graph database. It intentionally does not repeat standalone reads, writes, calls, call bindings, node IDs, edge IDs, or SQLite-equivalent relationship facts. Use `model\plc-graph.sqlite` for those.
+Do not use it as a graph database. For agent queries, prefer `model\plc-graph.sqlite`; exact translated statements are also stored as plain text in the `logicStatements` property on matching `Network` nodes. The YAML remains useful for human inspection and for confidence/notes.
 
 If this file marks a network as `partial` or `untranslated`, use the matching raw XML as the final proof source before changing or recommending PLC logic.
 
